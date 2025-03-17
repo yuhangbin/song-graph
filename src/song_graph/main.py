@@ -1,22 +1,69 @@
 """
-Main module for the Song-Graph project.
+FastAPI application for the Song-Graph project.
 """
 
-def greet(name: str) -> str:
+from typing import Optional
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from song_graph.database.session import session_manager
+from song_graph.repository.song_repository import SongRepository
+from song_graph.models.song import Song
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="Song-Graph API",
+    description="API for managing and analyzing music metadata",
+    version="1.0.0"
+)
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database connection on startup."""
+    session_manager.init_db()
+    session_manager.create_tables()
+
+# Dependency to get database session
+def get_db():
+    """Get database session."""
+    db = session_manager.get_session()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@app.get("/songs/{song_id}", response_model=dict)
+def get_song(song_id: int, db: Session = Depends(get_db)):
     """
-    Return a personalized greeting message.
+    Get a song by its ID.
     
     Args:
-        name (str): The name to greet
+        song_id: The ID of the song to retrieve
+        db: Database session (injected by FastAPI)
         
     Returns:
-        str: The greeting message
+        The song data as a dictionary
+        
+    Raises:
+        HTTPException: If the song is not found
     """
-    return f"Hello, {name}! Welcome to Song-Graph."
+    repo = SongRepository(db)
+    song = repo.get_by_id(song_id)
+    
+    if song is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Song with ID {song_id} not found"
+        )
+    
+    return song.to_dict()
 
-def main():
-    """Main entry point of the program."""
-    print(greet("User"))
-
-if __name__ == "__main__":
-    main() 
+@app.get("/")
+def root():
+    """Root endpoint returning API information."""
+    return {
+        "name": "Song-Graph API",
+        "version": "1.0.0",
+        "description": "API for managing and analyzing music metadata"
+    } 

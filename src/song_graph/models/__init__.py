@@ -2,6 +2,6 @@
 SQLAlchemy models for the song-graph project.
 """
 
-from .songs import Song
+from .song import Song
 
 __all__ = ['Song'] 
